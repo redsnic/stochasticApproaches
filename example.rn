@@ -1,0 +1,16 @@
+param c1 = 1;
+param c2 = c1;
+param c3 = 2;
+param c4 = c3;
+param c5 = 0.1;
+param c6 = c5;
+
+species X = 20;
+species Y;
+species Z;
+species W = 10;
+
+X:1 <- c1 -> Y:1;
+X:2 <- c3 -> Z:1;
+W:1, X:1 <- c5 -> X:2;
+

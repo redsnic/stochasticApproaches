@@ -1,0 +1,9 @@
+param gamma = 1; /* commento */
+param kappa = 2;  // ohohohoh
+
+species MRNA = 10; // test comment
+
+emptyset -- kappa*gamma -> MRNA:1;
+emptyset <- gamma*kappa -- MRNA:1;
+
+
