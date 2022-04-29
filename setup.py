@@ -6,6 +6,6 @@ setuptools.setup(
    description='A collection of tools based on the D-BSSE Stochastic Approaches course',
    author='Nicolò Rossi',
    author_email='olocin.issor@gmail.com',
-   install_requires=['wheel', 'numpy', 'scipy'],
+   install_requires=['wheel', 'numpy', 'scipy', 'matplotlib', 'tqdm'],
    packages=setuptools.find_packages()
 )

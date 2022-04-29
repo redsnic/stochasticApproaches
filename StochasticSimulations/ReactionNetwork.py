@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from scipy.linalg import expm
 from math import comb
 from tqdm import tqdm
+import matplotlib
 
 # from older homeworks
 
@@ -34,6 +35,27 @@ def mean(x):
     return sum(x)/len(x)
 
 class ReactionNetwork():
+
+    def simulate(self, mode, **kwparams):
+        limit = kwparams['time_limit']
+
+        if  mode == 'fr':
+            self.simulate_FR(limit)
+        elif mode == 'ssa':
+            self.simulate_SSA(limit)
+        elif mode == 'tl':
+            self.simulate_TL(limit, kwparams['tau_leap'])
+        elif mode == 'nr':
+            self.simulate_RTC(limit)
+        else:
+            raise Exception(f"invalid mode: {input['mode']}")
+        self.restore()
+        # keep in mind that the network is then to be reset by the user
+
+    def restore(self):
+        # reset to previous initial state
+        self.set_initial_state(self.state_dictionary_at_setup)
+        self.initialize()
 
     def __init__(self):
         # state
@@ -74,6 +96,7 @@ class ReactionNetwork():
         setup the initial state of the network
         """
         self.clear_state()
+        self.state_dictionary_at_setup = species
         for s,q in species:
             try:
                 self.state[self.species[s]] = q
@@ -397,10 +420,14 @@ class History():
             species_at_time[s] = [ st[self.species[s]] for st in state_at_time ]
         return species_at_time
 
-    def plot_at(self, time, species=None):
+    def plot_at(self, time, species=None, save_at=None, size_x=100, size_y=100, dpi=150):
         """
         plot last state before {time} for selected {species}
         """
+        if not save_at is None:
+            matplotlib.use('Agg')
+        plt.figure(figsize=(4*size_x/dpi, 4*size_y/dpi), dpi=dpi)
+
         if species is None: # plot all species
             species = [k for k,v in self.species.items()]
 
@@ -420,12 +447,19 @@ class History():
         plt.ylabel("Couts")
         plt.xlabel("Process outcome")
         plt.legend(title='Time')
-        plt.show()
+        if save_at:
+            plt.savefig(save_at)
+        else:
+            plt.show()
 
-    def plot_through(self, times, species=None):
+    def plot_through(self, times, species=None, save_at=None, size_x=100, size_y=100, dpi=300):
         """
         plot states and uncertainty at {times} for selected {species}
         """
+        if not save_at is None:
+            matplotlib.use('Agg')
+        plt.figure(figsize=(size_x/dpi, size_y/dpi), dpi=dpi)
+
         if species is None: # plot all species
             species = [k for k,v in self.species.items()]
 
@@ -446,7 +480,10 @@ class History():
         plt.ylabel("Quantity")
         plt.xlabel("Time")
         plt.legend(title='Time')
-        plt.show()
+        if save_at:
+            plt.savefig(save_at)
+        else:
+            plt.show()
 
     def plot_cloud(self, alpha=0.01, species=None):
         """

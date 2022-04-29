@@ -4,25 +4,94 @@ from StochasticSimulations.ReactionNetwork import ReactionNetwork
 
 # LEXER
 
-# symbol tables
-param_lookup = {}
-species_lookup = {}
-# reaction network object
-reaction_network = ReactionNetwork()
 
-# keyword (as per documentation)
-reserved = {
-    'species' : 'SPECIESKW',
-    'param' : 'PARAMKW',
-    'emptyset' : 'EMPTYSET'
-}
+class Lexer():
+    # keyword (as per documentation)
+    reserved = {
+        'species': 'SPECIESKW',
+        'param': 'PARAMKW',
+        'emptyset': 'EMPTYSET'
+    }
 
-# tokens
-tokens = [
-    'PLUS', 'MINUS', 'TIMES', 'DIV', 'NUMBER', 'OPEN', 'CLOSE', 'EXP', 'FLOAT', # math expressions
-    'PARAM', 'LEFTARROW', 'ARROWTAIL', 'RIGHTARROW', 'SPECIES', # reaction and param expressions
-    'EQUAL', 'SEMICOLON', 'COLON', 'COMMA' # symbols 
-] + list(reserved.values())
+    # tokens
+    tokens = [
+        # math expressions
+        'PLUS', 'MINUS', 'TIMES', 'DIV', 'NUMBER', 'OPEN', 'CLOSE', 'EXP', 'FLOAT',
+        # reaction and param expressions
+        'PARAM', 'LEFTARROW', 'ARROWTAIL', 'RIGHTARROW', 'SPECIES',
+        'EQUAL', 'SEMICOLON', 'COLON', 'COMMA'  # symbols
+    ] + list(reserved.values())
+
+    
+
+    # ignore whitespaces
+    t_ignore = ' \t\r'
+
+    # ignore comments (C-like)
+    def t_COMMENT(self, p):
+        r'//.*'
+        pass
+
+    def t_COMMENTBLOCK(self, p):
+        r'/\*.*\*/'
+        pass
+
+    # math tokens
+    t_PLUS = r'\+'
+    t_MINUS = r'-'
+    t_TIMES = r'\*'
+    t_DIV = r'/'
+    t_EXP = r'\^'
+    t_OPEN = r'\('
+    t_CLOSE = r'\)'
+    # single characters
+    t_EQUAL = r'='
+    t_SEMICOLON = r';'
+    t_COLON = r':'
+    t_COMMA = r','
+    # reaction arrows
+    t_LEFTARROW = r'<-'
+    t_ARROWTAIL = r'--'
+    t_RIGHTARROW = r'->'
+
+    # numbers
+
+    def t_FLOAT(self, t):
+        r'[0-9]+\.[0-9]*'
+        t.value = float(t.value)
+        return t
+
+    def t_NUMBER(self, t):
+        r'[0-9]+'
+        t.value = int(t.value)
+        return t
+
+    # species/param names
+
+    t_SPECIES = r'[A-Z][A-Za-z0-9_]*'
+
+    # manage both params and keywords (as they are lowercase)
+    def t_PARAM(self, t):
+        r'[a-z][A-Za-z0-9_]*'
+        t.type = self.reserved.get(t.value, 'PARAM')
+        return t
+
+    # ignore newline and track line number
+    def t_ignore_newline(self, t):
+        r'\n+'
+        t.lexer.lineno += t.value.count('\n')
+
+    def t_error(self, t):
+        raise Exception(
+            f'Syntax Error: {t.value[0]!r} at line {t.lexer.lineno}')
+
+    def build(self, **kwargs):
+        self.lexer = lex.lex(object=self, **kwargs)
+
+    def __init__(self):
+        pass
+
+# PARSER
 
 # mathematical precedence rules
 precedence = (
@@ -32,67 +101,20 @@ precedence = (
     ('right', 'UMINUS')
 )
 
-# ignore whitespaces
-t_ignore = ' \t'
+reserved = {
+    'species': 'SPECIESKW',
+    'param': 'PARAMKW',
+    'emptyset': 'EMPTYSET'
+}
 
-# ignore comments (C-like)
-def t_COMMENT(p):
-    r'//.*'
-    pass
-
-def t_COMMENTBLOCK(p):
-    r'/\*.*\*/'
-    pass
-
-# math tokens
-t_PLUS = r'\+'
-t_MINUS = r'-'
-t_TIMES = r'\*'
-t_DIV= r'/'
-t_EXP= r'\^'
-t_OPEN = r'\('
-t_CLOSE = r'\)'
-# single characters
-t_EQUAL = r'='
-t_SEMICOLON = r';'
-t_COLON = r':'
-t_COMMA = r','
-# reaction arrows
-t_LEFTARROW = r'<-'
-t_ARROWTAIL = r'--'
-t_RIGHTARROW = r'->'
-
-# numbers
-
-def t_FLOAT(t):
-    r'[0-9]+\.[0-9]*'
-    t.value = float(t.value)
-    return t
-
-def t_NUMBER(t):
-    r'[0-9]+'
-    t.value = int(t.value)
-    return t
-
-# species/param names
-
-t_SPECIES = r'[A-Z][A-Za-z0-9_]*'
-
-# manage both params and keywords (as they are lowercase)
-def t_PARAM(t):
-    r'[a-z][A-Za-z0-9_]*'
-    t.type = reserved.get(t.value,'PARAM')
-    return t
-
-# ignore newline and track line number
-def t_ignore_newline(t):
-    r'\n+'
-    t.lexer.lineno += t.value.count('\n')
-
-def t_error(t):
-    raise Exception(f'Syntax Error: {t.value[0]!r} at line {t.lexer.lineno}')
-
-# PARSER
+# tokens
+tokens = [
+    # math expressions
+    'PLUS', 'MINUS', 'TIMES', 'DIV', 'NUMBER', 'OPEN', 'CLOSE', 'EXP', 'FLOAT',
+    # reaction and param expressions
+    'PARAM', 'LEFTARROW', 'ARROWTAIL', 'RIGHTARROW', 'SPECIES',
+    'EQUAL', 'SEMICOLON', 'COLON', 'COMMA'  # symbols
+] + list(reserved.values())
 
 # --- core
 
@@ -101,9 +123,9 @@ def p_expression(p):
     """
     expression : innerexpr
     """
-    reaction_network.set_initial_state(unpack(species_lookup))
-    reaction_network.initialize()
-    p[0] = reaction_network
+    p.parser.reaction_network.set_initial_state(unpack(p.parser.species_lookup))
+    p.parser.reaction_network.initialize()
+    p[0] = p.parser.reaction_network
 
 # innerexpr manages the core of the program
 # there are three types of lines
@@ -126,42 +148,47 @@ def p_paramdefinition(p):
     paramdefinition : PARAMKW PARAM EQUAL mathexpression
     """
     try:
-        param_lookup[p[2]]
+        p.parser.param_lookup[p[2]]
         raise Exception(f'Error: multiple definitions of parameter {p[2]}')
     except:
-        param_lookup[p[2]] = p[4]
+        p.parser.param_lookup[p[2]] = p[4]
     p[0] = None
 
 # initialize a species to a certain value (default 0)
 def p_initialization(p):
     """
     initialization : SPECIESKW SPECIES
-                   | SPECIESKW SPECIES EQUAL intmathexpression
+                | SPECIESKW SPECIES EQUAL intmathexpression
     """
     try:
-        species_lookup[p[2]]
-        raise Exception(f'Error: multiple inizializations of species {p[2]}')
+        p.parser.species_lookup[p[2]]
+        raise Exception(
+            f'Error: multiple inizializations of species {p[2]}')
     except:
         if len(p) == 3:
-            param_lookup[p[2]] = 0
+            p.parser.param_lookup[p[2]] = 0
         else:
-            species_lookup[p[2]] = p[4]
+            p.parser.species_lookup[p[2]] = p[4]
     p[0] = None
 
 # define a reaction ( reactants -- (rate) -- reactants )
 def p_reaction(p):
     """
     reaction : reactants ARROWTAIL mathexpression RIGHTARROW reactants
-             | reactants LEFTARROW mathexpression ARROWTAIL reactants
-             | reactants LEFTARROW mathexpression RIGHTARROW reactants
+            | reactants LEFTARROW mathexpression ARROWTAIL reactants
+            | reactants LEFTARROW mathexpression RIGHTARROW reactants
     """
     if p[2] == "--":
-        reaction_network.add_reaction(unpack(p[1]), unpack(p[5]), p[3])
+        p.parser.reaction_network.add_reaction(
+            unpack(p[1]), unpack(p[5]), p[3])
     elif p[4] == '--':
-        reaction_network.add_reaction(unpack(p[5]), unpack(p[1]), p[3])
+        p.parser.reaction_network.add_reaction(
+            unpack(p[5]), unpack(p[1]), p[3])
     else:
-        reaction_network.add_reaction(unpack(p[1]), unpack(p[5]), p[3])
-        reaction_network.add_reaction(unpack(p[5]), unpack(p[1]), p[3])
+        p.parser.reaction_network.add_reaction(
+            unpack(p[1]), unpack(p[5]), p[3])
+        p.parser.reaction_network.add_reaction(
+            unpack(p[5]), unpack(p[1]), p[3])
     p[0] = None
 
 # reactants are comma separated lists of pairs SPECIES_NAME:SPECIES_QUANTITY
@@ -169,23 +196,25 @@ def p_reaction(p):
 def p_reactants(p):
     """
     reactants : reactants COMMA SPECIES COLON intmathexpression
-              | SPECIES COLON intmathexpression
-              | EMPTYSET
+            | SPECIES COLON intmathexpression
+            | EMPTYSET
     """
     current_reactant = {} if len(p) == 4 or len(p) == 2 else p[1]
     if len(p) != 2:
         try:
-            current_reactant[p[1] if len(p) == 4 else p[3]] += (p[3] if len(p) == 4 else p[5])
+            current_reactant[p[1] if len(
+                p) == 4 else p[3]] += (p[3] if len(p) == 4 else p[5])
         except:
-            current_reactant[p[1] if len(p) == 4 else p[3]] = (p[3] if len(p) == 4 else p[5])
+            current_reactant[p[1] if len(p) == 4 else p[3]] = (
+                p[3] if len(p) == 4 else p[5])
     p[0] = current_reactant
-
 
 # --- math ---
 
 # this section of the grammar implements basic mathematical operation
 
 # this rule manages operations that must have integer results (type checking!)
+
 def p_intmathexpression(p):
     '''
     intmathexpression : mathexpression
@@ -200,10 +229,10 @@ def p_intmathexpression(p):
 def p_mathexpression_binop(p):
     '''
     mathexpression : mathexpression PLUS mathexpression
-               | mathexpression MINUS mathexpression
-               | mathexpression DIV mathexpression
-               | mathexpression TIMES mathexpression
-               | mathexpression EXP mathexpression
+            | mathexpression MINUS mathexpression
+            | mathexpression DIV mathexpression
+            | mathexpression TIMES mathexpression
+            | mathexpression EXP mathexpression
     '''
     p[0] = bin_op(p[2], p[1], p[3])
 
@@ -234,7 +263,7 @@ def p_mathexpression_param(p):
     mathexpression : PARAM
     '''
     try:
-        p[0] = param_lookup[p[1]]
+        p[0] = p.parser.param_lookup[p[1]]
     except KeyError:
         raise Exception(f'Error: variable {p[1]} is undefined')
 
@@ -270,20 +299,28 @@ def bin_op(what, x1, x2):
         raise Exception(f'invalid operation {what}')
 
 # unroll a dictionary to a key value list
-def unpack(dic):
-    return [(k,v) for k,v in dic.items()]
 
-### --- MAIN PROGRAM ---
+def unpack(dic):
+    return [(k, v) for k, v in dic.items()]
+
+# --- MAIN PROGRAM ---
 
 def make_parser():
-    lexer = lex.lex()
-    return yacc.yacc()
+    lexer = Lexer()
+    lexer.build()
+    parser = yacc.yacc()
+    # symbol tables
+    parser.param_lookup = {}
+    parser.species_lookup = {}
+    # reaction network object
+    parser.reaction_network = ReactionNetwork()
+
+    return parser
+
 
 if __name__ == '__main__':
 
     # create parser an lexer
-
-    lexer = lex.lex()
     make_parser()
 
     # read input
@@ -292,15 +329,12 @@ if __name__ == '__main__':
     # text = ''.join(f.readlines())
 
     # uncomment to print the extracted tokens
-    #lexer.input(text)
-    #while True:
+    # lexer.input(text)
+    # while True:
     #    tok = lexer.token()
-    #    if not tok: 
+    #    if not tok:
     #        break      # No more input
     #    print(tok)
 
     # rn = parser.parse(text)
     # print(rn)
-
-
-
